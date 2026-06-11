@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SampleType {
+  TISSUE
+  CDNA
+}
+
+enum ExperimentType {
+  ENRICHMENT
+  ARRAY
+  LIGATION
+  LIBRARY
+  SEQUENCING
+  TISSUE_SECTION
+  SECTION_PLACEMENT
+  CDNA_PREP
+}
+
+model Project {
+  code      String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  samples   Sample[]
+  batches   SampleBatch[]
+}
+
+model SampleBatch {
+  id          Int      @id @default(autoincrement())
+  projectCode String
+  name        String
+  createdBy   String?
+  count       Int
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectCode], references: [code])
+  samples     Sample[]
+
+  @@index([projectCode])
+  @@index([createdAt])
+}
+
+model Sample {
+  id           String          @id
+  hashCode     String?
+  batchId      Int?
+  projectCode  String
+  sequence     Int
+  name         String
+  receivedAt   DateTime
+  storedAt     DateTime        @default(now())
+  type         SampleType
+  remark       String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  batch        SampleBatch?     @relation(fields: [batchId], references: [id])
+  project      Project         @relation(fields: [projectCode], references: [code])
+  detail       SampleDetail?
+
+  @@unique([projectCode, sequence])
+  @@index([hashCode])
+  @@index([projectCode])
+  @@index([storedAt])
+}
+
+model SampleDetail {
+  id                           Int      @id @default(autoincrement())
+  sampleId                     String   @unique
+  volume                       Float?
+  concentration                Float?
+  storageLocation              String?
+  tissueSource                 String?
+  technologyType               String?
+  originalFragmentDistribution String?
+  experimentMethod             String?
+  loadingVolume                Float?
+  remark                       String?
+  sample                       Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+}
+
+model SamplingRegistration {
+  id                 Int                @id @default(autoincrement())
+  title              String?
+  projectCode        String?
+  experimentType     ExperimentType
+  operator           String
+  remark             String?
+  chipNumber         String?            @unique
+  sequencingStrategy String?
+  storagePath        String?
+  registeredAt       DateTime           @default(now())
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  entries            SamplingEntry[]
+  sequencingResult   SequencingResult?
+
+  @@index([registeredAt])
+  @@index([projectCode])
+}
+
+model SamplingEntry {
+  id               Int                   @id @default(autoincrement())
+  registrationId   Int
+  sourceSampleId   String
+  inputAmountNg    Float
+  derivedSampleId  String                @unique
+  registration     SamplingRegistration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  derivedSample    DerivedSample         @relation(fields: [derivedSampleId], references: [id], onDelete: Cascade)
+
+  @@index([sourceSampleId])
+  @@index([registrationId])
+}
+
+model DerivedSample {
+  id              String            @id
+  hashCode        String?
+  sourceSampleId  String
+  experimentType  ExperimentType
+  suffix          String
+  sequence        Int
+  createdAt       DateTime          @default(now())
+  entry           SamplingEntry?
+  result          ExperimentResult?
+
+  @@unique([sourceSampleId, experimentType, sequence])
+  @@index([hashCode])
+  @@index([sourceSampleId, experimentType])
+}
+
+model ExperimentResult {
+  id                    Int            @id @default(autoincrement())
+  derivedSampleId       String         @unique
+  experimentType         ExperimentType
+  volume                Float?
+  concentration         Float?
+  storageLocation       String?
+  fragmentDistribution  String?
+  experimentMethod      String?
+  generationStrategy    String?
+  inputAmount           Float?
+  outputVolume          Float?
+  libraryDuration       String?
+  libraryStrategy       String?
+  absorbance260280      Float?
+  absorbance260230      Float?
+  barcode               String?
+  sliceCount            Int?
+  sliceDetails          String?
+  chipId                String?
+  imageStorageLocation  String?
+  qc                    String?
+  fragmentLength        String?
+  remark                String?
+  submittedAt           DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  derivedSample          DerivedSample  @relation(fields: [derivedSampleId], references: [id], onDelete: Cascade)
+}
+
+model SequencingResult {
+  id                 Int                  @id @default(autoincrement())
+  registrationId     Int                  @unique
+  dataAmount         String?
+  uploadPath         String?
+  sequencingStrategy String?
+  barcode            Int?
+  remark             String?
+  submittedAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  registration       SamplingRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+}

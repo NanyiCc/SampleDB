@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "_comment": "在 rules 中添加限制。示例：{\"sampleId\":\"ABC-0001\",\"allowedExperiments\":[\"ENRICHMENT\",\"ARRAY\"]}；也可以用 sampleIdPrefix 限制一组样本。",
+  "rules": []
+}

@@ -1,0 +1,28 @@
+{
+  "name": "sampledb",
+  "version": "0.1.0-dev.2",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:lan": "next dev -H 0.0.0.0 -p 3000",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "start:lan": "next start -H 0.0.0.0 -p 3002",
+    "db:push": "prisma db push",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "prisma": "^6.0.0",
+    "typescript": "latest"
+  }
+}

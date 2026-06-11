@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "storageLocations": ["-80冰箱A1", "-20冰箱B1", "4度冰箱C1", "常温样本柜D1"],
+  "sampleIntakeFields": [
+    { "key": "volume", "label": "体积", "type": "number", "unit": "µL", "required": false },
+    { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": false },
+    { "key": "storageLocation", "label": "储存位置", "type": "combobox", "optionSource": "storageLocations", "required": false },
+    { "key": "tissueSource", "label": "所属组织", "type": "text", "required": false },
+    { "key": "originalFragmentDistribution", "label": "原始片段均值", "type": "integer", "unit": "bp", "required": false }
+  ],
+  "experimentResultFields": {
+    "ENRICHMENT": [
+      { "key": "volume", "label": "体积", "type": "number", "unit": "µL", "required": false },
+      { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": false },
+      { "key": "storageLocation", "label": "储存位置", "type": "combobox", "optionSource": "storageLocations", "required": false },
+      { "key": "fragmentDistribution", "label": "片段均值", "type": "integer", "unit": "bp", "required": false },
+      { "key": "experimentMethod", "label": "实验方式", "type": "text", "required": false }
+    ],
+    "ARRAY": [
+      { "key": "volume", "label": "体积", "type": "number", "unit": "µL", "required": false },
+      { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": false },
+      { "key": "storageLocation", "label": "储存位置", "type": "combobox", "optionSource": "storageLocations", "required": false },
+      { "key": "fragmentDistribution", "label": "片段均值", "type": "integer", "unit": "bp", "required": false },
+      { "key": "generationStrategy", "label": "生成策略", "type": "select", "options": ["15连", "16连"], "required": false },
+      { "key": "experimentMethod", "label": "实验方式", "type": "text", "required": false },
+      { "key": "inputAmount", "label": "上样量", "type": "number", "unit": "µL", "required": false }
+    ],
+    "LIGATION": [
+      { "key": "inputAmount", "label": "投入量", "type": "number", "unit": "ng", "required": false },
+      { "key": "outputVolume", "label": "产出体积", "type": "number", "unit": "µL", "required": false },
+      { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": false },
+      { "key": "storageLocation", "label": "储存位置", "type": "combobox", "optionSource": "storageLocations", "required": false },
+      { "key": "fragmentDistribution", "label": "片段均值", "type": "integer", "unit": "bp", "required": false },
+      { "key": "experimentMethod", "label": "实验方式", "type": "text", "required": false }
+    ],
+    "LIBRARY": [
+      { "key": "inputAmount", "label": "投入量", "type": "number", "unit": "ng", "required": false },
+      { "key": "libraryDuration", "label": "建库时间", "type": "text", "required": false },
+      { "key": "libraryStrategy", "label": "建库策略", "type": "text", "required": false },
+      { "key": "volume", "label": "体积", "type": "number", "unit": "µL", "required": false },
+      { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": false },
+      { "key": "storageLocation", "label": "储存位置", "type": "combobox", "optionSource": "storageLocations", "required": false },
+      { "key": "fragmentDistribution", "label": "片段均值", "type": "integer", "unit": "bp", "required": false },
+      { "key": "absorbance260280", "label": "A260/280", "type": "number", "required": false },
+      { "key": "absorbance260230", "label": "A260/230", "type": "number", "required": false },
+      { "key": "barcode", "label": "Barcode", "type": "text", "required": false }
+    ],
+    "SEQUENCING": [],
+    "TISSUE_SECTION": [],
+    "SECTION_PLACEMENT": [
+      { "key": "chipId", "label": "芯片 ID", "type": "text", "required": true },
+      { "key": "imageStorageLocation", "label": "图像存储位置", "type": "text", "required": false },
+      { "key": "qc", "label": "QC", "type": "textarea", "required": false }
+    ],
+    "CDNA_PREP": [
+      { "key": "volume", "label": "体积", "type": "number", "unit": "µL", "required": true },
+      { "key": "concentration", "label": "浓度", "type": "number", "unit": "ng/µL", "required": true },
+      { "key": "fragmentLength", "label": "片段长度", "type": "integer", "unit": "bp", "required": true }
+    ]
+  },
+  "sequencingResultFields": [
+    { "key": "dataAmount", "label": "测序下机数据量", "type": "text", "required": false },
+    { "key": "uploadPath", "label": "上传服务器路径", "type": "text", "required": false },
+    { "key": "sequencingStrategy", "label": "测序策略", "type": "text", "required": false },
+    { "key": "barcode", "label": "Barcode", "type": "select", "options": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"], "required": false }
+  ],
+  "hideStorageLocationForExperiments": ["SEQUENCING"]
+}
