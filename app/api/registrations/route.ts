@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { withAuth } from "@/lib/auth";
 import {
   EXPERIMENT_CONFIG,
   ExperimentType,
@@ -34,7 +35,7 @@ type RegistrationBody = {
   }>;
 };
 
-export async function GET() {
+export const GET = withAuth(async () => {
   await ensureAllHashCodes();
 
   const registrations = await prisma.samplingRegistration.findMany({
@@ -60,9 +61,9 @@ export async function GET() {
   });
 
   return NextResponse.json({ registrations: await hydrateRegistrationSources(registrations) });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   const body = (await request.json()) as RegistrationBody;
   const experimentType = body.experimentType;
   const title = toOptionalString(body.title);
@@ -262,7 +263,7 @@ export async function POST(request: NextRequest) {
     console.error(error);
     return jsonError("取样登记失败，请稍后重试。", 500);
   }
-}
+});
 
 type RegistrationWithEntries = {
   entries: Array<{

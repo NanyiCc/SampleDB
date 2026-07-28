@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG } from "@/lib/domain";
 import { jsonError, toOptionalIntegerString, toOptionalNumber, toOptionalString } from "@/lib/http";
 import { addStorageLocationToConfig } from "@/lib/lab-form-config";
@@ -35,7 +36,7 @@ type RouteContext = {
   params: Promise<{ derivedSampleId: string }> | { derivedSampleId: string };
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAuth(async (request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -133,9 +134,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   await addStorageLocationToConfig(data.storageLocation);
 
   return NextResponse.json({ result });
-}
+});
 
-export async function DELETE(_request: NextRequest, context: RouteContext) {
+export const DELETE = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -166,7 +167,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});
 
 function toOptionalInteger(value: unknown) {
   if (value === null || value === undefined || value === "") {

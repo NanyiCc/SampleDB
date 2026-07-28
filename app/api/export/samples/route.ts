@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { SAMPLE_TYPES, formatDate, formatDateTime } from "@/lib/domain";
 import { escapeHtml, excelResponse, jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,7 @@ import { ensureAllHashCodes } from "@/lib/sample-identity";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   await ensureAllHashCodes();
 
   const batchId = Number(request.nextUrl.searchParams.get("batchId") ?? 0);
@@ -84,4 +85,4 @@ export async function GET(request: NextRequest) {
     rows,
     "样本入库表"
   );
-}
+});

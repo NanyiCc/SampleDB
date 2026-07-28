@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { jsonError, toOptionalNumber, toOptionalString } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 
@@ -17,7 +18,7 @@ type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAuth(async (request: NextRequest, context: RouteContext) => {
   const params = await context.params;
   const registrationId = Number(params.id);
   const body = (await request.json()) as ResultBody;
@@ -74,9 +75,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
 
   return Response.json({ result });
-}
+});
 
-export async function DELETE(_request: NextRequest, context: RouteContext) {
+export const DELETE = withAuth(async (_request: NextRequest, context: RouteContext) => {
   const params = await context.params;
   const registrationId = Number(params.id);
 
@@ -128,4 +129,4 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   ]);
 
   return Response.json({ ok: true });
-}
+});

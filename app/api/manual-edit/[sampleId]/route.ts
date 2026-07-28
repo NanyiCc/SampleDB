@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, normalizeSampleId, SAMPLE_TYPES } from "@/lib/domain";
 import { jsonError, toOptionalIntegerString, toOptionalNumber, toOptionalString } from "@/lib/http";
 import { addStorageLocationToConfig } from "@/lib/lab-form-config";
@@ -49,7 +50,7 @@ type ManualEditBody = {
   }>;
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -61,9 +62,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   return NextResponse.json(payload);
-}
+});
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+export const PATCH = withAuth(async (request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -209,7 +210,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const updatedPayload = await getManualEditPayload(sampleId);
   return NextResponse.json(updatedPayload);
-}
+});
 
 async function resolveInputToCanonicalId(input: string) {
   const normalized = normalizeSampleId(input);

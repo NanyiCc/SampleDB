@@ -17,11 +17,14 @@ import {
   Edit3,
   FileSearch,
   FlaskConical,
+  LogOut,
   Plus,
   RefreshCw,
   Save,
   Send,
-  Trash2
+  Trash2,
+  UserCog,
+  UserRound
 } from "lucide-react";
 import {
   EXPERIMENT_CONFIG,
@@ -52,6 +55,28 @@ type SampleBatch = {
   count: number;
   createdAt: string;
   samples?: Sample[];
+};
+
+type AuthUser = {
+  id: number;
+  username: string;
+  displayName: string | null;
+  role: string;
+  status: string;
+};
+
+type ManagedUser = {
+  id: number;
+  username: string;
+  displayName: string | null;
+  role: string;
+  status: string;
+  applicationNote: string | null;
+  rejectionReason: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  approvedBy?: { username: string; displayName: string | null } | null;
 };
 
 type Sample = {
@@ -300,7 +325,7 @@ type Message = {
   text: string;
 } | null;
 
-type PageKey = "inventory" | "sampling" | "experiments" | "query" | "edit";
+type PageKey = "inventory" | "sampling" | "experiments" | "query" | "edit" | "users";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const VOLUME_LABEL = "体积 (µL)";
@@ -405,12 +430,19 @@ const navItems: Array<{ key: PageKey; label: string; icon: ElementType }> = [
   { key: "sampling", label: "取样登记", icon: ClipboardList },
   { key: "experiments", label: "实验回填", icon: FlaskConical },
   { key: "query", label: "样本查询", icon: FileSearch },
-  { key: "edit", label: "数据修改", icon: Edit3 }
+  { key: "edit", label: "数据修改", icon: Edit3 },
+  { key: "users", label: "用户审批", icon: UserCog }
 ];
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({}));
+
+  if (response.status === 401) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+    throw new Error("登录已失效，请重新登录。");
+  }
 
   if (!response.ok) {
     throw new Error(payload.error ?? "请求失败，请稍后重试。");
@@ -498,6 +530,7 @@ function buildAvailableSamples(samples: Sample[], registrations: Registration[])
 
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("inventory");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [batches, setBatches] = useState<SampleBatch[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -511,12 +544,14 @@ export default function Home() {
   async function refreshData() {
     setLoading(true);
     try {
-      const [samplePayload, batchPayload, registrationPayload, configPayload] = await Promise.all([
+      const [authPayload, samplePayload, batchPayload, registrationPayload, configPayload] = await Promise.all([
+        requestJson<{ user: AuthUser }>("/api/auth/me"),
         requestJson<{ samples: Sample[] }>("/api/samples"),
         requestJson<{ batches: SampleBatch[] }>("/api/sample-batches"),
         requestJson<{ registrations: Registration[] }>("/api/registrations"),
         requestJson<LabFormConfig>("/api/lab-form-config")
       ]);
+      setCurrentUser(authPayload.user);
       setSamples(samplePayload.samples);
       setBatches(batchPayload.batches);
       setRegistrations(registrationPayload.registrations);
@@ -528,6 +563,11 @@ export default function Home() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
+  }
+
   useEffect(() => {
     refreshData();
   }, []);
@@ -535,7 +575,11 @@ export default function Home() {
   useEffect(() => {
     const readPageFromUrl = () => {
       const page = new URLSearchParams(window.location.search).get("page") as PageKey | null;
-      if (page && navItems.some((item) => item.key === page)) {
+      if (
+        page &&
+        navItems.some((item) => item.key === page) &&
+        (page !== "users" || currentUser?.role === "ADMIN")
+      ) {
         setActivePage(page);
       }
     };
@@ -543,7 +587,7 @@ export default function Home() {
     readPageFromUrl();
     window.addEventListener("popstate", readPageFromUrl);
     return () => window.removeEventListener("popstate", readPageFromUrl);
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!message) {
@@ -606,6 +650,9 @@ export default function Home() {
   );
 
   function switchPage(page: PageKey) {
+    if (page === "users" && currentUser?.role !== "ADMIN") {
+      return;
+    }
     setActivePage(page);
     const url = new URL(window.location.href);
     url.searchParams.set("page", page);
@@ -619,14 +666,28 @@ export default function Home() {
           <p className="eyebrow">本机样本数据库</p>
           <h1>实验室样本管理系统</h1>
         </div>
-        <button className="ghost-button" type="button" onClick={refreshData} disabled={loading}>
-          <RefreshCw size={16} />
-          刷新
-        </button>
+        <div className="topbar-actions">
+          {currentUser ? (
+            <span className="auth-user">
+              <UserRound size={16} />
+              {currentUser.displayName || currentUser.username}
+            </span>
+          ) : null}
+          <button className="ghost-button" type="button" onClick={refreshData} disabled={loading}>
+            <RefreshCw size={16} />
+            刷新
+          </button>
+          <button className="ghost-button" type="button" onClick={logout}>
+            <LogOut size={16} />
+            退出登录
+          </button>
+        </div>
       </header>
 
       <nav className="page-nav" aria-label="主页面">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => item.key !== "users" || currentUser?.role === "ADMIN")
+          .map((item) => {
           const Icon = item.icon;
           return (
             <button
@@ -638,8 +699,8 @@ export default function Home() {
               <Icon size={17} />
               {item.label}
             </button>
-          );
-        })}
+            );
+          })}
       </nav>
 
       {message ? <div className={`notice ${message.type}`}>{message.text}</div> : null}
@@ -710,6 +771,9 @@ export default function Home() {
       {activePage === "edit" ? (
         <ManualEditPage labFormConfig={labFormConfig} onMessage={setMessage} onRefresh={refreshData} />
       ) : null}
+      {activePage === "users" && currentUser?.role === "ADMIN" ? (
+        <UsersPage onMessage={setMessage} />
+      ) : null}
 
       <datalist id="array-strategy-options">
         <option value="15连" />
@@ -722,6 +786,150 @@ export default function Home() {
       </datalist>
     </main>
   );
+}
+
+function UsersPage({ onMessage }: { onMessage: (message: Message) => void }) {
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [workingId, setWorkingId] = useState<number | null>(null);
+  const [rejectionReasons, setRejectionReasons] = useState<Record<number, string>>({});
+
+  async function loadUsers() {
+    setLoading(true);
+    try {
+      const payload = await requestJson<{ users: ManagedUser[] }>("/api/admin/users");
+      setUsers(payload.users);
+    } catch (error) {
+      onMessage({ type: "error", text: error instanceof Error ? error.message : "加载用户失败。" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  async function updateUser(id: number, action: "approve" | "reject" | "disable" | "enable") {
+    setWorkingId(id);
+    try {
+      await requestJson(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          rejectionReason: rejectionReasons[id] ?? ""
+        })
+      });
+      onMessage({ type: "success", text: "用户状态已更新。" });
+      await loadUsers();
+    } catch (error) {
+      onMessage({ type: "error", text: error instanceof Error ? error.message : "更新用户失败。" });
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  const pendingCount = users.filter((user) => user.status === "PENDING").length;
+
+  return (
+    <section className="workspace users-page">
+      <div className="section-title">
+        <UserCog size={22} />
+        <div>
+          <h2>用户审批</h2>
+          <p>只有批准后的用户才能登录和使用样本库。</p>
+        </div>
+      </div>
+      <div className="users-summary">
+        <strong>{pendingCount}</strong>
+        <span>个待审批申请</span>
+        <button className="ghost-button" type="button" onClick={loadUsers} disabled={loading}>
+          <RefreshCw size={16} />
+          刷新列表
+        </button>
+      </div>
+      {loading ? <p className="empty-panel">正在加载用户列表...</p> : null}
+      {!loading && users.length === 0 ? <p className="empty-panel">目前没有用户记录。</p> : null}
+      {!loading && users.length > 0 ? (
+        <div className="table-wrap users-table-wrap">
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>用户</th>
+                <th>状态</th>
+                <th>申请说明</th>
+                <th>申请时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>
+                    <strong>{user.displayName || user.username}</strong>
+                    <small className="user-username">{user.username}</small>
+                  </td>
+                  <td><span className={`user-status ${user.status.toLowerCase()}`}>{userStatusLabel(user.status)}</span></td>
+                  <td>{user.applicationNote || "未填写"}</td>
+                  <td>{formatDateTime(user.createdAt)}</td>
+                  <td>
+                    <div className="user-actions">
+                      {user.status === "PENDING" ? (
+                        <>
+                          <button
+                            className="primary-button"
+                            type="button"
+                            onClick={() => updateUser(user.id, "approve")}
+                            disabled={workingId === user.id}
+                          >
+                            批准
+                          </button>
+                          <input
+                            aria-label={`${user.username} 拒绝原因`}
+                            placeholder="拒绝原因（可选）"
+                            value={rejectionReasons[user.id] ?? ""}
+                            onChange={(event) =>
+                              setRejectionReasons((current) => ({
+                                ...current,
+                                [user.id]: event.target.value
+                              }))
+                            }
+                          />
+                          <button className="ghost-button" type="button" onClick={() => updateUser(user.id, "reject")} disabled={workingId === user.id}>
+                            拒绝
+                          </button>
+                        </>
+                      ) : null}
+                      {user.status === "APPROVED" && user.role !== "ADMIN" ? (
+                        <button className="ghost-button" type="button" onClick={() => updateUser(user.id, "disable")} disabled={workingId === user.id}>
+                          停用
+                        </button>
+                      ) : null}
+                      {(user.status === "DISABLED" || user.status === "REJECTED") ? (
+                        <button className="ghost-button" type="button" onClick={() => updateUser(user.id, "enable")} disabled={workingId === user.id}>
+                          重新启用
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function userStatusLabel(status: string) {
+  return {
+    PENDING: "待审批",
+    APPROVED: "已批准",
+    REJECTED: "已拒绝",
+    DISABLED: "已停用"
+  }[status] ?? status;
 }
 
 function InventoryPage({

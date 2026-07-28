@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, formatDateTime, normalizeProjectCode, SAMPLE_TYPES } from "@/lib/domain";
 import { escapeHtml, excelResponse, jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,7 @@ type RouteContext = {
   params: Promise<{ projectCode: string }> | { projectCode: string };
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -101,7 +102,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     [...sampleRows, ...downstreamRows].join(""),
     `项目 ${projectCode}`
   );
-}
+});
 
 function sectionTitle(title: string) {
   return `<tr><th colspan="9">${escapeHtml(title)}</th></tr>`;

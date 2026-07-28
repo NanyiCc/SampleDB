@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { normalizeProjectCode } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { ensureAllHashCodes } from "@/lib/sample-identity";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   await ensureAllHashCodes();
 
   const query = normalizeProjectCode(request.nextUrl.searchParams.get("q") ?? "");
@@ -40,4 +41,4 @@ export async function GET(request: NextRequest) {
       batchCount: project._count.batches
     }))
   });
-}
+});

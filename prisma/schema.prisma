@@ -23,6 +23,39 @@ enum ExperimentType {
   CDNA_PREP
 }
 
+model User {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique
+  passwordHash    String
+  displayName     String?
+  role            String    @default("USER")
+  status          String    @default("PENDING")
+  applicationNote String?
+  rejectionReason String?
+  approvedAt      DateTime?
+  approvedById    Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  approvedBy      User?     @relation("UserApprovals", fields: [approvedById], references: [id])
+  approvedUsers   User[]    @relation("UserApprovals")
+  sessions        Session[]
+
+  @@index([status])
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Project {
   code      String   @id
   createdAt DateTime @default(now())

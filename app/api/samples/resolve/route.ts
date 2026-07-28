@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, SAMPLE_TYPES, normalizeSampleId } from "@/lib/domain";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,7 @@ import { ensureAllHashCodes, resolveSampleIdentity } from "@/lib/sample-identity
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   await ensureAllHashCodes();
 
   const query = normalizeSampleId(request.nextUrl.searchParams.get("q") ?? "");
@@ -32,4 +33,4 @@ export async function GET(request: NextRequest) {
             : "派生样本"
     }
   });
-}
+});

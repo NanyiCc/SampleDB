@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, normalizeSampleId, SAMPLE_TYPES, formatDateTime } from "@/lib/domain";
 import { escapeHtml, excelResponse, jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,7 @@ type RouteContext = {
   params: Promise<{ sampleId: string }> | { sampleId: string };
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -147,7 +148,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     [...currentRows, ...rootRows, ...upstreamRows, ...downstreamRows, ...sequencingRows].join(""),
     `查询结果 ${sampleId}`
   );
-}
+});
 
 async function getDerivedStep(id: string) {
   return prisma.derivedSample.findUnique({

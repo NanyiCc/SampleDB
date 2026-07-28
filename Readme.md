@@ -68,7 +68,26 @@ App. 取样登记，（可以登记取用多个样本，每一个样本取用的
 - 样本查询页：支持样本 ID 精确查询、样本 ID 包含查询、项目 ID 模糊筛选和项目详情查看
 - 查询结果、项目详情、入库编号 list、入库完整信息、取样登记表 Excel 兼容导出
 - 样本编号打印页面
-- 页面导航会写入 `?page=inventory`、`?page=sampling`、`?page=experiments`、`?page=query`、`?page=edit`，刷新后会留在当前页面
+- 页面导航会写入 `?page=inventory`、`?page=sampling`、`?page=experiments`、`?page=query`、`?page=edit`、`?page=users`，刷新后会留在当前页面
+
+## 登录鉴权
+
+系统现在默认要求登录后才能访问首页、打印页和所有业务 API。会话使用数据库会话表和 HttpOnly Cookie 保存，密码在 SQLite 中只保存为哈希值。
+
+首次运行前，在项目根目录 `.env` 中配置：
+
+```text
+AUTH_ADMIN_USERNAME="admin"
+AUTH_ADMIN_PASSWORD="请修改为你的管理员密码"
+AUTH_ADMIN_DISPLAY_NAME="系统管理员"
+AUTH_COOKIE_SECURE="false"
+```
+
+第一次使用配置的管理员账号登录时，系统会自动创建并批准 SQLite 用户记录。管理员账号以 `.env` 为配置来源，每次管理员登录时会将当前配置密码重新哈希后同步到用户记录，因此修改 `.env` 中的管理员密码并重启服务即可生效。
+
+普通用户可以从登录页进入“申请新账号”。注册申请初始为 `PENDING`，管理员在首页的“用户审批”页面批准后，用户才可以登录。管理员可以批准、拒绝、停用或重新启用普通用户；拒绝或停用会立即撤销该用户的已有会话。普通用户不能访问用户审批页面，也不能批准其他用户。
+
+内网通过普通 HTTP 访问时，`AUTH_COOKIE_SECURE` 必须保持 `false`；只有在已经配置 HTTPS 时才改为 `true`。不要把真实 `.env` 提交到 Git，迁移服务器时需要单独复制并检查这组鉴权配置。
 
 ## 页面名称修改
 
@@ -117,6 +136,7 @@ app/page.tsx
 
 ```bash
 npm install
+npx prisma generate
 npx prisma db push
 npm run dev
 ```
