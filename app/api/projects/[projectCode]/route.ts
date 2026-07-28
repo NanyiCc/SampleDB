@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, normalizeProjectCode, SAMPLE_TYPES } from "@/lib/domain";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,7 @@ type RouteContext = {
   params: Promise<{ projectCode: string }> | { projectCode: string };
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -86,4 +87,4 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       };
     })
   });
-}
+});

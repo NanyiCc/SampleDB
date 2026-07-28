@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { PROJECT_CODE_PATTERN, PROJECT_CODE_RULE_TEXT, formatSampleId, normalizeProjectCode } from "@/lib/domain";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   const projectCode = normalizeProjectCode(request.nextUrl.searchParams.get("projectCode") ?? "");
   const count = Number(request.nextUrl.searchParams.get("count") ?? 0);
 
@@ -27,4 +28,4 @@ export async function GET(request: NextRequest) {
   );
 
   return NextResponse.json({ ids, projectCode, startSequence });
-}
+});

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureAllHashCodes } from "@/lib/sample-identity";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   await ensureAllHashCodes();
 
   const batches = await prisma.sampleBatch.findMany({
@@ -25,4 +26,4 @@ export async function GET() {
   });
 
   return NextResponse.json({ batches });
-}
+});

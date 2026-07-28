@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { EXPERIMENT_CONFIG } from "@/lib/domain";
+import { withAuth } from "@/lib/auth";
 import { loadExperimentRuleConfig } from "@/lib/experiment-rules";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   const config = await loadExperimentRuleConfig();
 
   return NextResponse.json({
@@ -14,4 +15,4 @@ export async function GET() {
       allowedLabels: rule.allowedExperiments.map((type) => EXPERIMENT_CONFIG[type].label)
     }))
   });
-}
+});

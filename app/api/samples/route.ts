@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import {
   PROJECT_CODE_PATTERN,
@@ -45,7 +46,7 @@ type CreateSamplesBody = {
   }>;
 };
 
-export async function GET() {
+export const GET = withAuth(async () => {
   await ensureAllHashCodes();
 
   const samples = await prisma.sample.findMany({
@@ -65,9 +66,9 @@ export async function GET() {
   });
 
   return NextResponse.json({ samples });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   const body = (await request.json()) as CreateSamplesBody;
   const explicitSamples = Array.isArray(body.samples) ? body.samples : null;
 
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
     console.error(error);
     return jsonError("样本入库失败，请稍后重试。", 500);
   }
-}
+});
 
 async function createExplicitSamples(
   rawSamples: NonNullable<CreateSamplesBody["samples"]>,

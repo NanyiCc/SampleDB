@@ -1,5 +1,7 @@
 import { SAMPLE_TYPES, formatDate, formatDateTime } from "@/lib/domain";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,12 @@ type PrintPageProps = {
 
 export default async function PrintSamplesPage({ searchParams }: PrintPageProps) {
   const params = await searchParams;
+  const user = await getCurrentUser();
+  if (!user) {
+    const query = params.ids ? `?ids=${encodeURIComponent(params.ids)}` : "";
+    redirect(`/login?next=${encodeURIComponent(`/print/samples${query}`)}`);
+  }
+
   const ids =
     params.ids
       ?.split(",")

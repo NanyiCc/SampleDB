@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth";
 import { EXPERIMENT_CONFIG, formatDateTime } from "@/lib/domain";
 import { escapeHtml, excelResponse, jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,7 @@ type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
   await ensureAllHashCodes();
 
   const params = await context.params;
@@ -117,4 +118,4 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   ].join("");
 
   return excelResponse(`取样登记_${registration.id}.xls`, rows, `取样登记 ${registration.id}`);
-}
+});
