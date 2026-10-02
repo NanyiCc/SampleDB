@@ -75,6 +75,7 @@ export default function LoginPage() {
         <a className="login-secondary" href="/register">
           申请新账号
         </a>
+        <a className="login-secondary" href="/demo">打开浏览器工作区</a>
       </section>
     </main>
   );

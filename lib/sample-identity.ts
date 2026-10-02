@@ -8,6 +8,7 @@ type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 export type SampleIdentity = {
   id: string;
   hashCode: string | null;
+  tubeId: string | null;
   kind: "BASE_SAMPLE" | "DERIVED_SAMPLE";
   projectCode: string | null;
   type?: string;
@@ -97,7 +98,11 @@ export async function ensureAllHashCodes() {
   });
 }
 
-export async function resolveSampleIdentity(db: PrismaExecutor, value: string): Promise<SampleIdentity | null> {
+export async function resolveSampleIdentity(
+  db: PrismaExecutor,
+  value: string,
+  options: { tubeOnly?: boolean } = {}
+): Promise<SampleIdentity | null> {
   const normalized = normalizeSampleId(value);
 
   if (!normalized) {
@@ -107,17 +112,16 @@ export async function resolveSampleIdentity(db: PrismaExecutor, value: string): 
   const baseSample = await db.sample.findFirst({
     where: {
       OR: [
+        ...(options.tubeOnly ? [] : [{ id: normalized }, { hashCode: normalized }]),
         {
-          id: normalized
-        },
-        {
-          hashCode: normalized
+          tubeId: normalized
         }
       ]
     },
     select: {
       id: true,
       hashCode: true,
+      tubeId: true,
       projectCode: true,
       type: true
     }
@@ -127,10 +131,15 @@ export async function resolveSampleIdentity(db: PrismaExecutor, value: string): 
     return {
       id: baseSample.id,
       hashCode: baseSample.hashCode,
+      tubeId: baseSample.tubeId,
       kind: "BASE_SAMPLE",
       projectCode: baseSample.projectCode,
       type: baseSample.type
     };
+  }
+
+  if (options.tubeOnly) {
+    return null;
   }
 
   const derivedSample = await db.derivedSample.findFirst({
@@ -159,6 +168,7 @@ export async function resolveSampleIdentity(db: PrismaExecutor, value: string): 
   return {
     id: derivedSample.id,
     hashCode: derivedSample.hashCode,
+    tubeId: null,
     kind: "DERIVED_SAMPLE",
     projectCode: await resolveProjectCode(db, derivedSample.sourceSampleId),
     experimentType: derivedSample.experimentType

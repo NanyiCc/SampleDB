@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-type RouteContext = { params: Promise<{ id: string }> | { id: string } };
+type RouteContext = { params: Promise<{ id: string }> };
 type Action = "approve" | "reject" | "disable" | "enable";
 
 export async function PATCH(request: NextRequest, context: RouteContext) {

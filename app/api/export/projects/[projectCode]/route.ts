@@ -8,7 +8,7 @@ import { ensureAllHashCodes } from "@/lib/sample-identity";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ projectCode: string }> | { projectCode: string };
+  params: Promise<{ projectCode: string }>;
 };
 
 export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
@@ -64,12 +64,13 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   }
 
   const sampleRows = [
-    sectionTitle("项目原始样本"),
-    row(["样本ID", "短码", "样本名称", "入库人", "类型", "储存位置", "收样时间", "下游实验数", "已提交下游数"]),
+    sectionTitle("项目原始样本", 10),
+    row(["样本ID", "冻存管ID", "短码", "样本名称", "入库人", "类型", "储存位置", "收样时间", "下游实验数", "已提交下游数"]),
     ...samples.map((sample) => {
       const items = downstreamBySource.get(sample.id) ?? [];
       return row([
         sample.id,
+        sample.tubeId ?? "",
         sample.hashCode ?? "",
         sample.name,
         sample.batch?.createdBy ?? "",
@@ -83,7 +84,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   ];
   const downstreamRows = [
     sectionTitle("下游样本"),
-    row(["原始样本ID", "派生样本ID", "短码", "实验类型", "登记ID", "上样量/投入量(ng)", "提交时间"]),
+    row(["原始样本ID", "派生样本ID", "短码", "实验类型", "登记ID", "取样量/投入量", "单位", "提交时间"]),
     ...downstream.map((item) =>
       row([
         item.sourceSampleId,
@@ -91,7 +92,9 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
         item.hashCode ?? "",
         EXPERIMENT_CONFIG[item.experimentType].label,
         item.entry?.registration.id ?? "",
-        item.entry?.inputAmountNg ?? "",
+        item.entry?.inputAmount ?? item.entry?.inputAmountNg ?? "",
+        item.entry?.inputUnit ??
+          (item.entry?.inputAmountNg !== null && item.entry?.inputAmountNg !== undefined ? "ng" : ""),
         item.result?.submittedAt ? formatDateTime(item.result.submittedAt) : ""
       ])
     )
@@ -104,8 +107,8 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   );
 });
 
-function sectionTitle(title: string) {
-  return `<tr><th colspan="9">${escapeHtml(title)}</th></tr>`;
+function sectionTitle(title: string, colSpan = 9) {
+  return `<tr><th colspan="${colSpan}">${escapeHtml(title)}</th></tr>`;
 }
 
 function row(cells: unknown[]) {

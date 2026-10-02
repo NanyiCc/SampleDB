@@ -8,7 +8,7 @@ import { ensureAllHashCodes } from "@/lib/sample-identity";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ projectCode: string }> | { projectCode: string };
+  params: Promise<{ projectCode: string }>;
 };
 
 export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {

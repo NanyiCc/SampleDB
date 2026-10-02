@@ -7,7 +7,7 @@ import { PrintButton } from "./print-button";
 export const dynamic = "force-dynamic";
 
 type PrintPageProps = {
-  searchParams: Promise<{ ids?: string }> | { ids?: string };
+  searchParams: Promise<{ ids?: string }>;
 };
 
 export default async function PrintSamplesPage({ searchParams }: PrintPageProps) {

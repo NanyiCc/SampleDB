@@ -29,11 +29,37 @@ type ResultBody = {
   imageStorageLocation?: string;
   qc?: string;
   fragmentLength?: string;
+  experimenter?: string;
+  experimentDate?: string;
+  cellCountInstrument?: string;
+  viability?: unknown;
+  cellConcentrationDirect?: unknown;
+  cellConcentrationDiluted?: unknown;
+  averageDiameter?: unknown;
+  aggregationRate?: unknown;
+  nucleatedRate?: unknown;
+  expectedCellCapture?: string;
+  loadingCellCount?: string;
+  loadingVolume?: unknown;
+  csbVolume?: unknown;
+  resuspensionBuffer?: string;
+  riskOnInstrument?: string;
+  remainingSample?: string;
+  hasCryopreservedCells?: string;
+  experimentOperation?: string;
+  libraryDate?: string;
+  pipStorageLocation?: string;
+  cdnaConcentration?: unknown;
+  cdnaFragmentLength?: string;
+  cdnaPeakPath?: string;
+  libraryConcentration?: unknown;
+  libraryFragmentLength?: string;
+  libraryPeakPath?: string;
   remark?: string;
 };
 
 type RouteContext = {
-  params: Promise<{ derivedSampleId: string }> | { derivedSampleId: string };
+  params: Promise<{ derivedSampleId: string }>;
 };
 
 export const POST = withAuth(async (request: NextRequest, context: RouteContext) => {
@@ -116,6 +142,32 @@ export const POST = withAuth(async (request: NextRequest, context: RouteContext)
     imageStorageLocation: toOptionalString(body.imageStorageLocation),
     qc: toOptionalString(body.qc),
     fragmentLength: toOptionalIntegerString(body.fragmentLength),
+    experimenter: toOptionalString(body.experimenter),
+    experimentDate: toOptionalString(body.experimentDate),
+    cellCountInstrument: toOptionalString(body.cellCountInstrument),
+    viability: toOptionalNumber(body.viability),
+    cellConcentrationDirect: toOptionalNumber(body.cellConcentrationDirect),
+    cellConcentrationDiluted: toOptionalNumber(body.cellConcentrationDiluted),
+    averageDiameter: toOptionalNumber(body.averageDiameter),
+    aggregationRate: toOptionalNumber(body.aggregationRate),
+    nucleatedRate: toOptionalNumber(body.nucleatedRate),
+    expectedCellCapture: toOptionalString(body.expectedCellCapture),
+    loadingCellCount: toOptionalString(body.loadingCellCount),
+    loadingVolume: toOptionalNumber(body.loadingVolume),
+    csbVolume: toOptionalNumber(body.csbVolume),
+    resuspensionBuffer: toOptionalString(body.resuspensionBuffer),
+    riskOnInstrument: toOptionalString(body.riskOnInstrument),
+    remainingSample: toOptionalString(body.remainingSample),
+    hasCryopreservedCells: toOptionalString(body.hasCryopreservedCells),
+    experimentOperation: toOptionalString(body.experimentOperation),
+    libraryDate: toOptionalString(body.libraryDate),
+    pipStorageLocation: toOptionalString(body.pipStorageLocation),
+    cdnaConcentration: toOptionalNumber(body.cdnaConcentration),
+    cdnaFragmentLength: toOptionalString(body.cdnaFragmentLength),
+    cdnaPeakPath: toOptionalString(body.cdnaPeakPath),
+    libraryConcentration: toOptionalNumber(body.libraryConcentration),
+    libraryFragmentLength: toOptionalString(body.libraryFragmentLength),
+    libraryPeakPath: toOptionalString(body.libraryPeakPath),
     remark: toOptionalString(body.remark),
     submittedAt: mode === "submit" ? new Date() : null
   };

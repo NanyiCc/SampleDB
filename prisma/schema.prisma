@@ -10,6 +10,9 @@ datasource db {
 enum SampleType {
   TISSUE
   CDNA
+  WHOLE_BLOOD
+  PLASMA
+  CELL
 }
 
 enum ExperimentType {
@@ -18,6 +21,7 @@ enum ExperimentType {
   LIGATION
   LIBRARY
   SEQUENCING
+  SINGLE_CELL
   TISSUE_SECTION
   SECTION_PLACEMENT
   CDNA_PREP
@@ -81,6 +85,7 @@ model SampleBatch {
 model Sample {
   id           String          @id
   hashCode     String?
+  tubeId       String?         @unique
   batchId      Int?
   projectCode  String
   sequence     Int
@@ -113,6 +118,20 @@ model SampleDetail {
   experimentMethod             String?
   loadingVolume                Float?
   remark                       String?
+  tubeRecordName               String?
+  freshBloodStatus             String?
+  frozenWholeBloodTubeCount    Int?
+  frozenPlasmaTubeCount        Int?
+  frozenCellTubeCount          Int?
+  qualityControlCellCount      String?
+  storageCondition             String?
+  preservationMedium           String?
+  experimentDate               String?
+  experimentLocation           String?
+  experimenter                 String?
+  checker                      String?
+  patientGroup                 String?
+  projectTeacher               String?
   sample                       Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
 }
 
@@ -140,7 +159,10 @@ model SamplingEntry {
   id               Int                   @id @default(autoincrement())
   registrationId   Int
   sourceSampleId   String
-  inputAmountNg    Float
+  // Legacy field retained for existing registrations created before units were configurable.
+  inputAmountNg    Float?
+  inputAmount      Float?
+  inputUnit        String?
   derivedSampleId  String                @unique
   registration     SamplingRegistration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   derivedSample    DerivedSample         @relation(fields: [derivedSampleId], references: [id], onDelete: Cascade)
@@ -188,6 +210,32 @@ model ExperimentResult {
   imageStorageLocation  String?
   qc                    String?
   fragmentLength        String?
+  experimenter          String?
+  experimentDate        String?
+  cellCountInstrument   String?
+  viability             Float?
+  cellConcentrationDirect  Float?
+  cellConcentrationDiluted Float?
+  averageDiameter       Float?
+  aggregationRate       Float?
+  nucleatedRate         Float?
+  expectedCellCapture   String?
+  loadingCellCount      String?
+  loadingVolume         Float?
+  csbVolume             Float?
+  resuspensionBuffer    String?
+  riskOnInstrument      String?
+  remainingSample       String?
+  hasCryopreservedCells String?
+  experimentOperation   String?
+  libraryDate           String?
+  pipStorageLocation    String?
+  cdnaConcentration     Float?
+  cdnaFragmentLength    String?
+  cdnaPeakPath          String?
+  libraryConcentration  Float?
+  libraryFragmentLength String?
+  libraryPeakPath       String?
   remark                String?
   submittedAt           DateTime?
   createdAt             DateTime       @default(now())

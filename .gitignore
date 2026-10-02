@@ -1,5 +1,6 @@
 node_modules
 .next
+.pages-build
 .codex
 .agents
 out
@@ -19,4 +20,6 @@ yarn-error.log*
 .vercel
 .turbo
 coverage
+portable-packages
+*.tsbuildinfo
 .DS_Store

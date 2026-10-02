@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { EXPERIMENT_CONFIG, normalizeSampleId, SAMPLE_TYPES } from "@/lib/domain";
+import {
+  EXPERIMENT_CONFIG,
+  isBloodTubeSampleType,
+  normalizeSampleId,
+  SAMPLE_TYPES
+} from "@/lib/domain";
 import { jsonError, toOptionalIntegerString, toOptionalNumber, toOptionalString } from "@/lib/http";
 import { addStorageLocationToConfig } from "@/lib/lab-form-config";
 import { prisma } from "@/lib/prisma";
@@ -9,12 +14,13 @@ import { ensureAllHashCodes, resolveSampleIdentity } from "@/lib/sample-identity
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ sampleId: string }> | { sampleId: string };
+  params: Promise<{ sampleId: string }>;
 };
 
 type ManualEditBody = {
   sample?: {
     name?: string;
+    tubeId?: string;
     type?: keyof typeof SAMPLE_TYPES;
     remark?: string;
     detail?: {
@@ -46,6 +52,32 @@ type ManualEditBody = {
     imageStorageLocation?: string;
     qc?: string;
     fragmentLength?: string;
+    experimenter?: string;
+    experimentDate?: string;
+    cellCountInstrument?: string;
+    viability?: unknown;
+    cellConcentrationDirect?: unknown;
+    cellConcentrationDiluted?: unknown;
+    averageDiameter?: unknown;
+    aggregationRate?: unknown;
+    nucleatedRate?: unknown;
+    expectedCellCapture?: string;
+    loadingCellCount?: string;
+    loadingVolume?: unknown;
+    csbVolume?: unknown;
+    resuspensionBuffer?: string;
+    riskOnInstrument?: string;
+    remainingSample?: string;
+    hasCryopreservedCells?: string;
+    experimentOperation?: string;
+    libraryDate?: string;
+    pipStorageLocation?: string;
+    cdnaConcentration?: unknown;
+    cdnaFragmentLength?: string;
+    cdnaPeakPath?: string;
+    libraryConcentration?: unknown;
+    libraryFragmentLength?: string;
+    libraryPeakPath?: string;
     remark?: string;
   }>;
 };
@@ -78,49 +110,52 @@ export const PATCH = withAuth(async (request: NextRequest, context: RouteContext
 
   try {
     await prisma.$transaction(async (tx) => {
-    if (body.sample && payload.rootSample) {
-      const type = body.sample.type && body.sample.type in SAMPLE_TYPES ? body.sample.type : payload.rootSample.type;
-      const originalFragmentDistribution = toOptionalIntegerString(
-        body.sample.detail?.originalFragmentDistribution
-      );
-      const storageLocation = toOptionalString(body.sample.detail?.storageLocation);
+      if (body.sample && payload.rootSample) {
+        const type = body.sample.type && body.sample.type in SAMPLE_TYPES ? body.sample.type : payload.rootSample.type;
+        const originalFragmentDistribution = toOptionalIntegerString(
+          body.sample.detail?.originalFragmentDistribution
+        );
+        const storageLocation = toOptionalString(body.sample.detail?.storageLocation);
 
-      if (body.sample.detail?.originalFragmentDistribution && originalFragmentDistribution === null) {
-        throw new Error("INVALID_FRAGMENT_DISTRIBUTION");
-      }
+        if (body.sample.detail?.originalFragmentDistribution && originalFragmentDistribution === null) {
+          throw new Error("INVALID_FRAGMENT_DISTRIBUTION");
+        }
 
-      await tx.sample.update({
-        where: {
-          id: payload.rootSample.id
-        },
-        data: {
-          name: body.sample.name?.trim() ?? payload.rootSample.name,
-          type,
-          remark: toOptionalString(body.sample.remark),
-          detail:
-            type === "CDNA"
-              ? {
-                  upsert: {
-                    create: {
-                      volume: toOptionalNumber(body.sample.detail?.volume),
-                      concentration: toOptionalNumber(body.sample.detail?.concentration),
-                      storageLocation,
-                      tissueSource: toOptionalString(body.sample.detail?.tissueSource),
-                      originalFragmentDistribution
-                    },
-                    update: {
-                      volume: toOptionalNumber(body.sample.detail?.volume),
-                      concentration: toOptionalNumber(body.sample.detail?.concentration),
-                      storageLocation,
-                      tissueSource: toOptionalString(body.sample.detail?.tissueSource),
-                      originalFragmentDistribution
+        await tx.sample.update({
+          where: {
+            id: payload.rootSample.id
+          },
+          data: {
+            name: body.sample.name?.trim() ?? payload.rootSample.name,
+            tubeId: body.sample.tubeId?.trim()
+              ? normalizeSampleId(body.sample.tubeId)
+              : payload.rootSample.tubeId,
+            type,
+            remark: toOptionalString(body.sample.remark),
+            detail:
+              type === "CDNA" || isBloodTubeSampleType(type)
+                ? {
+                    upsert: {
+                      create: {
+                        volume: toOptionalNumber(body.sample.detail?.volume),
+                        concentration: toOptionalNumber(body.sample.detail?.concentration),
+                        storageLocation,
+                        tissueSource: toOptionalString(body.sample.detail?.tissueSource),
+                        originalFragmentDistribution
+                      },
+                      update: {
+                        volume: toOptionalNumber(body.sample.detail?.volume),
+                        concentration: toOptionalNumber(body.sample.detail?.concentration),
+                        storageLocation,
+                        tissueSource: toOptionalString(body.sample.detail?.tissueSource),
+                        originalFragmentDistribution
+                      }
                     }
                   }
-                }
-              : undefined
-        }
-      });
-    }
+                : undefined
+          }
+        });
+      }
 
     const allowedResultIds = new Set(payload.upstreamSteps.map((step) => step.id));
     for (const result of body.results ?? []) {
@@ -165,6 +200,32 @@ export const PATCH = withAuth(async (request: NextRequest, context: RouteContext
           imageStorageLocation: toOptionalString(result.imageStorageLocation),
           qc: toOptionalString(result.qc),
           fragmentLength: toOptionalIntegerString(result.fragmentLength),
+          experimenter: toOptionalString(result.experimenter),
+          experimentDate: toOptionalString(result.experimentDate),
+          cellCountInstrument: toOptionalString(result.cellCountInstrument),
+          viability: toOptionalNumber(result.viability),
+          cellConcentrationDirect: toOptionalNumber(result.cellConcentrationDirect),
+          cellConcentrationDiluted: toOptionalNumber(result.cellConcentrationDiluted),
+          averageDiameter: toOptionalNumber(result.averageDiameter),
+          aggregationRate: toOptionalNumber(result.aggregationRate),
+          nucleatedRate: toOptionalNumber(result.nucleatedRate),
+          expectedCellCapture: toOptionalString(result.expectedCellCapture),
+          loadingCellCount: toOptionalString(result.loadingCellCount),
+          loadingVolume: toOptionalNumber(result.loadingVolume),
+          csbVolume: toOptionalNumber(result.csbVolume),
+          resuspensionBuffer: toOptionalString(result.resuspensionBuffer),
+          riskOnInstrument: toOptionalString(result.riskOnInstrument),
+          remainingSample: toOptionalString(result.remainingSample),
+          hasCryopreservedCells: toOptionalString(result.hasCryopreservedCells),
+          experimentOperation: toOptionalString(result.experimentOperation),
+          libraryDate: toOptionalString(result.libraryDate),
+          pipStorageLocation: toOptionalString(result.pipStorageLocation),
+          cdnaConcentration: toOptionalNumber(result.cdnaConcentration),
+          cdnaFragmentLength: toOptionalString(result.cdnaFragmentLength),
+          cdnaPeakPath: toOptionalString(result.cdnaPeakPath),
+          libraryConcentration: toOptionalNumber(result.libraryConcentration),
+          libraryFragmentLength: toOptionalString(result.libraryFragmentLength),
+          libraryPeakPath: toOptionalString(result.libraryPeakPath),
           remark: toOptionalString(result.remark),
           submittedAt: step.result?.submittedAt ?? new Date()
         },
@@ -188,6 +249,32 @@ export const PATCH = withAuth(async (request: NextRequest, context: RouteContext
           imageStorageLocation: toOptionalString(result.imageStorageLocation),
           qc: toOptionalString(result.qc),
           fragmentLength: toOptionalIntegerString(result.fragmentLength),
+          experimenter: toOptionalString(result.experimenter),
+          experimentDate: toOptionalString(result.experimentDate),
+          cellCountInstrument: toOptionalString(result.cellCountInstrument),
+          viability: toOptionalNumber(result.viability),
+          cellConcentrationDirect: toOptionalNumber(result.cellConcentrationDirect),
+          cellConcentrationDiluted: toOptionalNumber(result.cellConcentrationDiluted),
+          averageDiameter: toOptionalNumber(result.averageDiameter),
+          aggregationRate: toOptionalNumber(result.aggregationRate),
+          nucleatedRate: toOptionalNumber(result.nucleatedRate),
+          expectedCellCapture: toOptionalString(result.expectedCellCapture),
+          loadingCellCount: toOptionalString(result.loadingCellCount),
+          loadingVolume: toOptionalNumber(result.loadingVolume),
+          csbVolume: toOptionalNumber(result.csbVolume),
+          resuspensionBuffer: toOptionalString(result.resuspensionBuffer),
+          riskOnInstrument: toOptionalString(result.riskOnInstrument),
+          remainingSample: toOptionalString(result.remainingSample),
+          hasCryopreservedCells: toOptionalString(result.hasCryopreservedCells),
+          experimentOperation: toOptionalString(result.experimentOperation),
+          libraryDate: toOptionalString(result.libraryDate),
+          pipStorageLocation: toOptionalString(result.pipStorageLocation),
+          cdnaConcentration: toOptionalNumber(result.cdnaConcentration),
+          cdnaFragmentLength: toOptionalString(result.cdnaFragmentLength),
+          cdnaPeakPath: toOptionalString(result.cdnaPeakPath),
+          libraryConcentration: toOptionalNumber(result.libraryConcentration),
+          libraryFragmentLength: toOptionalString(result.libraryFragmentLength),
+          libraryPeakPath: toOptionalString(result.libraryPeakPath),
           remark: toOptionalString(result.remark)
         }
       });

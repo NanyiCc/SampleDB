@@ -13,13 +13,13 @@ export const GET = withAuth(async (request: NextRequest) => {
   const query = normalizeSampleId(request.nextUrl.searchParams.get("q") ?? "");
 
   if (!query) {
-    return jsonError("请输入样本 ID 或短码。");
+    return jsonError("请输入样本 ID、冻存管 ID 或短码。");
   }
 
   const identity = await resolveSampleIdentity(prisma, query);
 
   if (!identity) {
-    return jsonError("没有找到该样本 ID 或短码。", 404);
+    return jsonError("没有找到该样本 ID、冻存管 ID 或短码。", 404);
   }
 
   return NextResponse.json({

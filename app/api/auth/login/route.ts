@@ -5,6 +5,7 @@ import {
   toAuthUser,
   verifyPassword
 } from "@/lib/auth";
+import { readStoredAdminCredential } from "@/lib/admin-credentials";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -19,10 +20,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请输入用户名和密码。" }, { status: 400 });
     }
 
-    const isConfiguredAdmin = username === process.env.AUTH_ADMIN_USERNAME?.trim();
+    const configuredAdmin = await readStoredAdminCredential();
+    if (!configuredAdmin) {
+      return NextResponse.json(
+        { error: "系统尚未初始化管理员账号。请在服务器终端启动项目以完成设置。" },
+        { status: 503 }
+      );
+    }
+    const isConfiguredAdmin = username === configuredAdmin?.username;
     const user = isConfiguredAdmin
-      ? await ensureConfiguredAdmin()
+      ? await ensureConfiguredAdmin(configuredAdmin)
       : await prisma.user.findUnique({ where: { username } });
+
+    if (user?.role === "ADMIN" && !isConfiguredAdmin) {
+      return NextResponse.json({ error: "用户名或密码错误。" }, { status: 401 });
+    }
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json({ error: "用户名或密码错误。" }, { status: 401 });
@@ -48,6 +60,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "登录服务尚未完成配置，请检查 .env 中的鉴权参数。" }, { status: 500 });
+    return NextResponse.json({ error: "登录服务尚未完成配置，请检查独立管理员凭据。" }, { status: 500 });
   }
 }

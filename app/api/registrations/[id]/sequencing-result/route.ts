@@ -15,7 +15,7 @@ type ResultBody = {
 };
 
 type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export const POST = withAuth(async (request: NextRequest, context: RouteContext) => {

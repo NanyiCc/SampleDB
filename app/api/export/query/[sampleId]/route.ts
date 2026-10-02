@@ -8,7 +8,7 @@ import { ensureAllHashCodes, resolveSampleIdentity } from "@/lib/sample-identity
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ sampleId: string }> | { sampleId: string };
+  params: Promise<{ sampleId: string }>;
 };
 
 export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
@@ -38,7 +38,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   });
 
   if (!baseSample && !derivedSample) {
-    return jsonError("没有找到该样本 ID。", 404);
+    return jsonError("没有找到该样本 ID、冻存管 ID 或短码。", 404);
   }
 
   const upstream = await buildUpstream(sampleId);
@@ -63,10 +63,11 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
 
   const currentRows = [
     sectionTitle("当前样本"),
-    row(["样本ID", "短码", "类型", "项目ID/实验", "时间", "备注"]),
+    row(["样本ID", "冻存管ID", "短码", "类型", "项目ID/实验", "时间", "备注"]),
     baseSample
       ? row([
           baseSample.id,
+          baseSample.tubeId ?? "",
           baseSample.hashCode ?? "",
           SAMPLE_TYPES[baseSample.type],
           baseSample.projectCode,
@@ -75,6 +76,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
         ])
       : row([
           derivedSample?.id ?? "",
+          "",
           derivedSample?.hashCode ?? "",
           "实验派生样本",
           derivedSample ? EXPERIMENT_CONFIG[derivedSample.experimentType].label : "",
@@ -85,9 +87,10 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   const rootRows = upstream.rootSample
     ? [
         sectionTitle("原始来源"),
-        row(["样本ID", "短码", "项目ID", "样本名称", "入库人", "样本类型", "储存位置", "收样时间"]),
+        row(["样本ID", "冻存管ID", "短码", "项目ID", "样本名称", "入库人", "样本类型", "储存位置", "收样时间"]),
         row([
           upstream.rootSample.id,
+          upstream.rootSample.tubeId ?? "",
           upstream.rootSample.hashCode ?? "",
           upstream.rootSample.projectCode,
           upstream.rootSample.name,
@@ -100,7 +103,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
     : [];
   const upstreamRows = [
     sectionTitle("上游步骤"),
-    row(["派生样本ID", "短码", "来源样本ID", "实验类型", "登记ID", "上样量/投入量(ng)", "提交时间"]),
+    row(["派生样本ID", "短码", "来源样本ID", "实验类型", "登记ID", "取样量/投入量", "单位", "提交时间"]),
     ...upstream.steps.map((step) =>
       row([
         step.id,
@@ -108,14 +111,16 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
         step.sourceSampleId,
         EXPERIMENT_CONFIG[step.experimentType].label,
         step.entry?.registration.id ?? "",
-        step.entry?.inputAmountNg ?? "",
+        step.entry?.inputAmount ?? step.entry?.inputAmountNg ?? "",
+        step.entry?.inputUnit ??
+          (step.entry?.inputAmountNg !== null && step.entry?.inputAmountNg !== undefined ? "ng" : ""),
         step.result?.submittedAt ? formatDateTime(step.result.submittedAt) : ""
       ])
     )
   ];
   const downstreamRows = [
     sectionTitle("下游取用"),
-    row(["派生样本ID", "短码", "来源样本ID", "实验类型", "登记ID", "上样量/投入量(ng)", "提交时间"]),
+    row(["派生样本ID", "短码", "来源样本ID", "实验类型", "登记ID", "取样量/投入量", "单位", "提交时间"]),
     ...downstream.map((step) =>
       row([
         step.id,
@@ -123,7 +128,9 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
         step.sourceSampleId,
         EXPERIMENT_CONFIG[step.experimentType].label,
         step.entry?.registration.id ?? "",
-        step.entry?.inputAmountNg ?? "",
+        step.entry?.inputAmount ?? step.entry?.inputAmountNg ?? "",
+        step.entry?.inputUnit ??
+          (step.entry?.inputAmountNg !== null && step.entry?.inputAmountNg !== undefined ? "ng" : ""),
         step.result?.submittedAt ? formatDateTime(step.result.submittedAt) : ""
       ])
     )

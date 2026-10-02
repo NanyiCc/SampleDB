@@ -1,25 +1,44 @@
 export const SAMPLE_TYPES = {
   TISSUE: "组织",
-  CDNA: "cDNA"
+  CDNA: "cDNA",
+  WHOLE_BLOOD: "全血",
+  PLASMA: "血浆",
+  CELL: "细胞"
 } as const;
 
 export type SampleType = keyof typeof SAMPLE_TYPES;
 
+export const BLOOD_TUBE_SAMPLE_TYPES = ["WHOLE_BLOOD", "PLASMA", "CELL"] as const;
+export type BloodTubeSampleType = (typeof BLOOD_TUBE_SAMPLE_TYPES)[number];
+
+export function isBloodTubeSampleType(value: string | null | undefined): value is BloodTubeSampleType {
+  return BLOOD_TUBE_SAMPLE_TYPES.some((type) => type === value);
+}
+
+export const FRESH_BLOOD_STATUS_OPTIONS = ["正常", "溶血", "高脂", "溶血且高脂"] as const;
+export const STORAGE_CONDITION_OPTIONS = ["液氮", "-80℃冰箱", "干冰", "4℃冰箱", "常温"] as const;
+export const CELL_PRESERVATION_MEDIUM_OPTIONS = [
+  "DMSO+FBS",
+  "直接冻存",
+  "紫头抗凝管",
+  "trizol"
+] as const;
+export const SAMPLE_CHECKER_OPTIONS = ["徐红丽", "贾思凯", "陶晨光"] as const;
 export const EXPERIMENT_CONFIG = {
   ENRICHMENT: {
-    label: "富集结果",
+    label: "FS生物素富集",
     shortLabel: "富集",
     suffix: "T",
     accent: "#0f766e"
   },
   ARRAY: {
-    label: "阵列生成",
+    label: "FS阵列生成",
     shortLabel: "阵列",
     suffix: "A",
     accent: "#b45309"
   },
   LIGATION: {
-    label: "连接结果",
+    label: "FS全长链接连接",
     shortLabel: "连接",
     suffix: "L",
     accent: "#be123c"
@@ -31,10 +50,16 @@ export const EXPERIMENT_CONFIG = {
     accent: "#4338ca"
   },
   SEQUENCING: {
-    label: "测序上机",
+    label: "测序",
     shortLabel: "测序",
     suffix: "SEQ",
     accent: "#2563eb"
+  },
+  SINGLE_CELL: {
+    label: "单细胞",
+    shortLabel: "单细胞",
+    suffix: "SC",
+    accent: "#0e7490"
   },
   TISSUE_SECTION: {
     label: "组织切片",
@@ -43,7 +68,7 @@ export const EXPERIMENT_CONFIG = {
     accent: "#7c3aed"
   },
   SECTION_PLACEMENT: {
-    label: "实贴片",
+    label: "贴片",
     shortLabel: "贴片",
     suffix: "SLD",
     accent: "#0891b2"

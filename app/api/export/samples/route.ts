@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { SAMPLE_TYPES, formatDate, formatDateTime } from "@/lib/domain";
+import {
+  SAMPLE_TYPES,
+  formatDate,
+  formatDateTime,
+  isBloodTubeSampleType
+} from "@/lib/domain";
 import { escapeHtml, excelResponse, jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { ensureAllHashCodes } from "@/lib/sample-identity";
@@ -46,6 +51,7 @@ export const GET = withAuth(async (request: NextRequest) => {
   const rows = [
     `<tr>
       <th>样本ID</th>
+      <th>冻存管ID</th>
       <th>短码</th>
       <th>项目ID</th>
       <th>样本名称</th>
@@ -53,16 +59,29 @@ export const GET = withAuth(async (request: NextRequest) => {
       <th>样本类型</th>
       <th>收样时间</th>
       <th>入库时间</th>
-      <th>体积 (µL)</th>
+      <th>体积</th>
+      <th>体积单位</th>
       <th>浓度 (ng/µL)</th>
       <th>储存位置</th>
       <th>所属组织</th>
       <th>原始片段均值 (bp)</th>
+      <th>管上记录名称</th>
+      <th>新鲜血液情况</th>
+      <th>质检细胞数量 (个)</th>
+      <th>储存条件</th>
+      <th>细胞保存介质</th>
+      <th>实验日期</th>
+      <th>实验地点</th>
+      <th>实验员</th>
+      <th>登记及核对人员</th>
+      <th>患者组别信息</th>
+      <th>对应项目老师</th>
       <th>备注</th>
     </tr>`,
     ...samples.map(
       (sample) => `<tr>
       <td>${escapeHtml(sample.id)}</td>
+      <td>${escapeHtml(sample.tubeId ?? "")}</td>
       <td>${escapeHtml(sample.hashCode ?? "")}</td>
       <td>${escapeHtml(sample.projectCode)}</td>
       <td>${escapeHtml(sample.name)}</td>
@@ -71,10 +90,28 @@ export const GET = withAuth(async (request: NextRequest) => {
       <td>${escapeHtml(formatDate(sample.receivedAt))}</td>
       <td>${escapeHtml(formatDateTime(sample.storedAt))}</td>
       <td>${escapeHtml(sample.detail?.volume ?? "")}</td>
+      <td>${escapeHtml(
+        sample.detail?.volume === null || sample.detail?.volume === undefined
+          ? ""
+          : isBloodTubeSampleType(sample.type)
+            ? "mL"
+            : "µL"
+      )}</td>
       <td>${escapeHtml(sample.detail?.concentration ?? "")}</td>
       <td>${escapeHtml(sample.detail?.storageLocation ?? "")}</td>
       <td>${escapeHtml(sample.detail?.tissueSource ?? "")}</td>
       <td>${escapeHtml(sample.detail?.originalFragmentDistribution ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.tubeRecordName ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.freshBloodStatus ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.qualityControlCellCount ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.storageCondition ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.preservationMedium ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.experimentDate ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.experimentLocation ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.experimenter ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.checker ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.patientGroup ?? "")}</td>
+      <td>${escapeHtml(sample.detail?.projectTeacher ?? "")}</td>
       <td>${escapeHtml(sample.remark ?? sample.detail?.remark ?? "")}</td>
     </tr>`
     )

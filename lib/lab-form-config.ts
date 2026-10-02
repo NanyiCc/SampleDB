@@ -1,8 +1,11 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { EXPERIMENT_CONFIG, ExperimentType } from "@/lib/domain";
+import {
+  EXPERIMENT_CONFIG,
+  ExperimentType
+} from "@/lib/domain";
 
-export type FieldType = "text" | "number" | "integer" | "select" | "combobox" | "textarea";
+export type FieldType = "text" | "number" | "integer" | "select" | "combobox" | "textarea" | "date";
 
 export type FieldConfig = {
   key: string;
@@ -55,7 +58,33 @@ const RESULT_FIELD_KEYS = new Set([
   "chipId",
   "imageStorageLocation",
   "qc",
-  "fragmentLength"
+  "fragmentLength",
+  "experimenter",
+  "experimentDate",
+  "cellCountInstrument",
+  "viability",
+  "cellConcentrationDirect",
+  "cellConcentrationDiluted",
+  "averageDiameter",
+  "aggregationRate",
+  "nucleatedRate",
+  "expectedCellCapture",
+  "loadingCellCount",
+  "loadingVolume",
+  "csbVolume",
+  "resuspensionBuffer",
+  "riskOnInstrument",
+  "remainingSample",
+  "hasCryopreservedCells",
+  "experimentOperation",
+  "libraryDate",
+  "pipStorageLocation",
+  "cdnaConcentration",
+  "cdnaFragmentLength",
+  "cdnaPeakPath",
+  "libraryConcentration",
+  "libraryFragmentLength",
+  "libraryPeakPath"
 ]);
 const SEQUENCING_FIELD_KEYS = new Set([
   "dataAmount",
@@ -63,7 +92,7 @@ const SEQUENCING_FIELD_KEYS = new Set([
   "sequencingStrategy",
   "barcode"
 ]);
-const FIELD_TYPES = new Set<FieldType>(["text", "number", "integer", "select", "combobox", "textarea"]);
+const FIELD_TYPES = new Set<FieldType>(["text", "number", "integer", "select", "combobox", "textarea", "date"]);
 
 export const DEFAULT_LAB_FORM_CONFIG: Omit<LabFormConfig, "path" | "loadedAt" | "error"> = {
   version: 1,
@@ -113,6 +142,38 @@ export const DEFAULT_LAB_FORM_CONFIG: Omit<LabFormConfig, "path" | "loadedAt" | 
       { key: "barcode", label: "Barcode", type: "text" }
     ],
     SEQUENCING: [],
+    SINGLE_CELL: [
+      { key: "experimenter", label: "实验员", type: "text" },
+      { key: "experimentDate", label: "实验日期", type: "date" },
+      { key: "cellCountInstrument", label: "计数仪", type: "text" },
+      { key: "viability", label: "活率", type: "number", unit: "%" },
+      { key: "cellConcentrationDirect", label: "细胞浓度（直接计数）", type: "number", unit: "个/µL" },
+      { key: "cellConcentrationDiluted", label: "细胞浓度（稀释计数）", type: "number", unit: "个/µL" },
+      { key: "averageDiameter", label: "平均直径", type: "number", unit: "µm" },
+      { key: "aggregationRate", label: "结团率", type: "number", unit: "%" },
+      { key: "nucleatedRate", label: "有核率", type: "number", unit: "%" },
+      { key: "expectedCellCapture", label: "预期细胞捕获数", type: "text" },
+      { key: "loadingCellCount", label: "上机细胞数", type: "text" },
+      { key: "loadingVolume", label: "上机体积", type: "number", unit: "µL" },
+      { key: "csbVolume", label: "CSB 体积", type: "number", unit: "µL" },
+      { key: "resuspensionBuffer", label: "重悬 buffer", type: "text" },
+      { key: "riskOnInstrument", label: "是否风险上机", type: "text" },
+      { key: "remainingSample", label: "样本剩余情况", type: "text" },
+      { key: "hasCryopreservedCells", label: "是否有细胞冻存", type: "text" },
+      {
+        key: "experimentOperation",
+        label: "实验操作（其他需要备注的内容）",
+        type: "textarea"
+      },
+      { key: "libraryDate", label: "建库日期", type: "date" },
+      { key: "pipStorageLocation", label: "pip 存放点", type: "text" },
+      { key: "cdnaConcentration", label: "cDNA 浓度", type: "number", unit: "ng/µL" },
+      { key: "cdnaFragmentLength", label: "cDNA 片段", type: "text", unit: "bp" },
+      { key: "cdnaPeakPath", label: "cDNA 峰图保存路径", type: "text" },
+      { key: "libraryConcentration", label: "文库浓度", type: "number", unit: "ng/µL" },
+      { key: "libraryFragmentLength", label: "文库片段", type: "text", unit: "bp" },
+      { key: "libraryPeakPath", label: "文库峰图保存路径", type: "text" }
+    ],
     TISSUE_SECTION: [],
     SECTION_PLACEMENT: [
       { key: "chipId", label: "芯片 ID", type: "text", required: true },

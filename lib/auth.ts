@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { readStoredAdminCredential, type StoredAdminCredential } from "@/lib/admin-credentials";
 import { prisma } from "@/lib/prisma";
 
 export const AUTH_COOKIE_NAME = "lab_session";
@@ -14,15 +15,7 @@ export type AuthUser = {
   status: string;
 };
 
-function requiredEnv(name: string) {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`缺少环境变量 ${name}，请先配置鉴权参数。`);
-  }
-  return value;
-}
-
-function passwordHash(password: string) {
+export function passwordHash(password: string) {
   const salt = randomBytes(16).toString("hex");
   const digest = scryptSync(password, salt, 64).toString("hex");
   return `scrypt$${salt}$${digest}`;
@@ -63,30 +56,41 @@ export function toAuthUser(user: {
   };
 }
 
-export async function ensureConfiguredAdmin() {
-  const username = requiredEnv("AUTH_ADMIN_USERNAME");
-  const password = requiredEnv("AUTH_ADMIN_PASSWORD");
-  const displayName = process.env.AUTH_ADMIN_DISPLAY_NAME?.trim() || username;
-  const now = new Date();
+export async function ensureConfiguredAdmin(credential?: StoredAdminCredential) {
+  const configuredAdmin = credential ?? (await readStoredAdminCredential());
+  if (!configuredAdmin) {
+    throw new Error("未找到独立管理员凭据。请先通过 npm run portable:start 或 npm run dev 初始化管理员账号。");
+  }
 
-  return prisma.user.upsert({
-    where: { username },
-    create: {
-      username,
-      passwordHash: passwordHash(password),
-      displayName,
-      role: "ADMIN",
-      status: "APPROVED",
-      approvedAt: now
-    },
-    update: {
-      passwordHash: passwordHash(password),
-      displayName,
-      role: "ADMIN",
-      status: "APPROVED",
-      rejectionReason: null,
-      approvedAt: now
-    }
+  const now = new Date();
+  return prisma.$transaction(async (transaction) => {
+    await transaction.user.updateMany({
+      where: {
+        role: "ADMIN",
+        username: { not: configuredAdmin.username }
+      },
+      data: { status: "DISABLED" }
+    });
+
+    return transaction.user.upsert({
+      where: { username: configuredAdmin.username },
+      create: {
+        username: configuredAdmin.username,
+        passwordHash: configuredAdmin.passwordHash,
+        displayName: configuredAdmin.displayName,
+        role: "ADMIN",
+        status: "APPROVED",
+        approvedAt: now
+      },
+      update: {
+        passwordHash: configuredAdmin.passwordHash,
+        displayName: configuredAdmin.displayName,
+        role: "ADMIN",
+        status: "APPROVED",
+        rejectionReason: null,
+        approvedAt: now
+      }
+    });
   });
 }
 
@@ -111,6 +115,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     return null;
   }
 
+  if (session.user.role === "ADMIN") {
+    const configuredAdmin = await readStoredAdminCredential();
+    if (configuredAdmin?.username !== session.user.username) {
+      return null;
+    }
+  }
+
   return toAuthUser(session.user);
 }
 
@@ -120,7 +131,11 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const user = await getCurrentUser();
-  return user?.role === "ADMIN" && user.status === "APPROVED" ? user : null;
+  if (!user || user.role !== "ADMIN" || user.status !== "APPROVED") {
+    return null;
+  }
+  const configuredAdmin = await readStoredAdminCredential();
+  return configuredAdmin?.username === user.username ? user : null;
 }
 
 export function withAuth<TContext>(
@@ -180,4 +195,4 @@ export function clearSessionCookie(response: NextResponse) {
   });
 }
 
-export { hashSessionToken, passwordHash };
+export { hashSessionToken };

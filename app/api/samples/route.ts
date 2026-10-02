@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/auth";
+import { getCurrentUser, withAuth } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import {
+  CELL_PRESERVATION_MEDIUM_OPTIONS,
+  FRESH_BLOOD_STATUS_OPTIONS,
   PROJECT_CODE_PATTERN,
   PROJECT_CODE_RULE_TEXT,
+  SAMPLE_CHECKER_OPTIONS,
+  STORAGE_CONDITION_OPTIONS,
   formatSampleId,
+  isBloodTubeSampleType,
   normalizeProjectCode,
   normalizeSampleId,
   SAMPLE_TYPES
@@ -19,6 +24,7 @@ export const runtime = "nodejs";
 type CreateSamplesBody = {
   projectCode?: string;
   name?: string;
+  tubeId?: string;
   createdBy?: string;
   receivedAt?: string;
   type?: keyof typeof SAMPLE_TYPES;
@@ -34,11 +40,26 @@ type CreateSamplesBody = {
     experimentMethod?: string;
     loadingVolume?: unknown;
     remark?: string;
+    tubeRecordName?: string;
+    freshBloodStatus?: string;
+    frozenWholeBloodTubeCount?: unknown;
+    frozenPlasmaTubeCount?: unknown;
+    frozenCellTubeCount?: unknown;
+    qualityControlCellCount?: string;
+    storageCondition?: string;
+    preservationMedium?: string;
+    experimentDate?: string;
+    experimentLocation?: string;
+    experimenter?: string;
+    checker?: string;
+    patientGroup?: string;
+    projectTeacher?: string;
   };
   samples?: Array<{
     id?: string;
     projectCode?: string;
     name?: string;
+    tubeId?: string;
     receivedAt?: string;
     type?: keyof typeof SAMPLE_TYPES;
     remark?: string;
@@ -71,14 +92,19 @@ export const GET = withAuth(async () => {
 export const POST = withAuth(async (request: NextRequest) => {
   const body = (await request.json()) as CreateSamplesBody;
   const explicitSamples = Array.isArray(body.samples) ? body.samples : null;
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return jsonError("请先登录后再使用样本库管理系统。", 401);
+  }
+  const createdBy = currentUser.displayName?.trim() || currentUser.username;
 
   if (explicitSamples) {
-    return createExplicitSamples(explicitSamples, body.createdBy);
+    return createExplicitSamples(explicitSamples, createdBy);
   }
 
   const projectCode = normalizeProjectCode(body.projectCode ?? "");
   const name = body.name?.trim() ?? "";
-  const createdBy = body.createdBy?.trim() ?? "";
+  const tubeId = normalizeSampleId(body.tubeId ?? "");
   const type = body.type;
   const count = Number(body.count ?? 0);
   const receivedAt = body.receivedAt ? new Date(body.receivedAt) : null;
@@ -91,6 +117,10 @@ export const POST = withAuth(async (request: NextRequest) => {
     return jsonError("请填写入库人。");
   }
 
+  if (!tubeId) {
+    return jsonError("请填写冻存管 ID。");
+  }
+
   if (!type || !(type in SAMPLE_TYPES)) {
     return jsonError("请选择有效的样本类型。");
   }
@@ -99,8 +129,17 @@ export const POST = withAuth(async (request: NextRequest) => {
     return jsonError("入库数量必须是 1 到 200 之间的整数。");
   }
 
+  if (count > 1) {
+    return jsonError("批量入库请通过 samples 列表为每个冻存管分别填写已有 ID。");
+  }
+
   if (!receivedAt || Number.isNaN(receivedAt.getTime())) {
     return jsonError("请填写有效的收样时间。");
+  }
+
+  const detailValidationError = validateBloodTubeDetail(type, body.detail);
+  if (detailValidationError) {
+    return jsonError(detailValidationError);
   }
 
   try {
@@ -144,6 +183,7 @@ export const POST = withAuth(async (request: NextRequest) => {
           data: {
             id: sampleId,
             hashCode: await generateUniqueHashCode(tx, sampleId),
+            tubeId,
             batchId: batch.id,
             projectCode,
             sequence,
@@ -152,20 +192,8 @@ export const POST = withAuth(async (request: NextRequest) => {
             type,
             remark: toOptionalString(body.remark),
             detail:
-              type === "CDNA"
-                ? {
-                    create: {
-                      volume: toOptionalNumber(detail.volume),
-                      concentration: toOptionalNumber(detail.concentration),
-                      storageLocation,
-                      tissueSource: toOptionalString(detail.tissueSource),
-                      technologyType: toOptionalString(detail.technologyType),
-                      originalFragmentDistribution,
-                      experimentMethod: toOptionalString(detail.experimentMethod),
-                      loadingVolume: toOptionalNumber(detail.loadingVolume),
-                      remark: toOptionalString(detail.remark)
-                    }
-                  }
+              type === "CDNA" || isBloodTubeSampleType(type)
+                ? { create: buildSampleDetailData(detail, storageLocation, originalFragmentDistribution, type) }
                 : undefined
           },
           include: {
@@ -190,6 +218,9 @@ export const POST = withAuth(async (request: NextRequest) => {
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (Array.isArray(error.meta?.target) && error.meta.target.includes("tubeId")) {
+        return jsonError("冻存管 ID 已存在，请检查每个冻存管的已有编号。", 409);
+      }
       return jsonError("生成样本 ID 时发生重复，请重试。", 409);
     }
 
@@ -212,6 +243,7 @@ async function createExplicitSamples(
     const projectCode = normalizeProjectCode(sample.projectCode ?? projectFromId ?? "");
     const sequence = Number(sequenceText);
     const name = sample.name?.trim() ?? "";
+    const tubeId = normalizeSampleId(sample.tubeId ?? "");
     const type = sample.type;
     const receivedAt = sample.receivedAt ? new Date(sample.receivedAt) : null;
 
@@ -221,6 +253,7 @@ async function createExplicitSamples(
       projectCode,
       sequence,
       name,
+      tubeId,
       type,
       receivedAt
     };
@@ -246,6 +279,10 @@ async function createExplicitSamples(
       return jsonError(`样本 ID 格式无效：${sample.id}`);
     }
 
+    if (!sample.tubeId) {
+      return jsonError(`${sample.id} 必须填写冻存管 ID。`);
+    }
+
     if (!Number.isInteger(sample.sequence) || sample.sequence < 1) {
       return jsonError(`样本 ID 序号无效：${sample.id}`);
     }
@@ -257,11 +294,21 @@ async function createExplicitSamples(
     if (!sample.receivedAt || Number.isNaN(sample.receivedAt.getTime())) {
       return jsonError(`请填写 ${sample.id} 的有效收样时间。`);
     }
+
+    const detailValidationError = validateBloodTubeDetail(sample.type, sample.detail);
+    if (detailValidationError) {
+      return jsonError(`${sample.id}：${detailValidationError}`);
+    }
   }
 
   const uniqueIds = new Set(samples.map((sample) => sample.id));
   if (uniqueIds.size !== samples.length) {
     return jsonError("同一批入库中不能出现重复样本 ID。");
+  }
+
+  const uniqueTubeIds = new Set(samples.map((sample) => sample.tubeId));
+  if (uniqueTubeIds.size !== samples.length) {
+    return jsonError("同一批入库中不能出现重复冻存管 ID。");
   }
 
   try {
@@ -297,6 +344,7 @@ async function createExplicitSamples(
           data: {
             id: sample.id,
             hashCode: await generateUniqueHashCode(tx, sample.id),
+            tubeId: sample.tubeId,
             batchId: batch.id,
             projectCode: sample.projectCode,
             sequence: sample.sequence,
@@ -305,19 +353,14 @@ async function createExplicitSamples(
             type: sample.type as keyof typeof SAMPLE_TYPES,
             remark: toOptionalString(sample.remark),
             detail:
-              sample.type === "CDNA"
+              sample.type === "CDNA" || isBloodTubeSampleType(sample.type)
                 ? {
-                    create: {
-                      volume: toOptionalNumber(detail.volume),
-                      concentration: toOptionalNumber(detail.concentration),
+                    create: buildSampleDetailData(
+                      detail,
                       storageLocation,
-                      tissueSource: toOptionalString(detail.tissueSource),
-                      technologyType: toOptionalString(detail.technologyType),
                       originalFragmentDistribution,
-                      experimentMethod: toOptionalString(detail.experimentMethod),
-                      loadingVolume: toOptionalNumber(detail.loadingVolume),
-                      remark: toOptionalString(detail.remark)
-                    }
+                      sample.type
+                    )
                   }
                 : undefined
           },
@@ -345,10 +388,96 @@ async function createExplicitSamples(
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (Array.isArray(error.meta?.target) && error.meta.target.includes("tubeId")) {
+        return jsonError("冻存管 ID 已存在，请检查每个冻存管的已有编号。", 409);
+      }
       return jsonError("样本 ID 已存在，请重新生成编号后再提交。", 409);
     }
 
     console.error(error);
     return jsonError("样本入库失败，请稍后重试。", 500);
   }
+}
+
+function buildSampleDetailData(
+  detail: CreateSamplesBody["detail"],
+  storageLocation: string | null,
+  originalFragmentDistribution: string | null,
+  sampleType: keyof typeof SAMPLE_TYPES
+) {
+  return {
+    volume: toOptionalNumber(detail?.volume),
+    concentration: toOptionalNumber(detail?.concentration),
+    storageLocation,
+    tissueSource: toOptionalString(detail?.tissueSource),
+    technologyType: toOptionalString(detail?.technologyType),
+    originalFragmentDistribution,
+    experimentMethod: toOptionalString(detail?.experimentMethod),
+    loadingVolume: toOptionalNumber(detail?.loadingVolume),
+    remark: toOptionalString(detail?.remark),
+    tubeRecordName: toOptionalString(detail?.tubeRecordName),
+    freshBloodStatus: toOptionalString(detail?.freshBloodStatus),
+    frozenWholeBloodTubeCount: toOptionalInteger(detail?.frozenWholeBloodTubeCount),
+    frozenPlasmaTubeCount: toOptionalInteger(detail?.frozenPlasmaTubeCount),
+    frozenCellTubeCount: toOptionalInteger(detail?.frozenCellTubeCount),
+    qualityControlCellCount:
+      sampleType === "CELL" ? toOptionalString(detail?.qualityControlCellCount) : null,
+    storageCondition: toOptionalString(detail?.storageCondition),
+    preservationMedium: sampleType === "CELL" ? toOptionalString(detail?.preservationMedium) : null,
+    experimentDate: toOptionalString(detail?.experimentDate),
+    experimentLocation: toOptionalString(detail?.experimentLocation),
+    experimenter: toOptionalString(detail?.experimenter),
+    checker: toOptionalString(detail?.checker),
+    patientGroup: toOptionalString(detail?.patientGroup),
+    projectTeacher: toOptionalString(detail?.projectTeacher)
+  };
+}
+
+function validateBloodTubeDetail(
+  sampleType: keyof typeof SAMPLE_TYPES | undefined,
+  detail: CreateSamplesBody["detail"]
+) {
+  if (!isBloodTubeSampleType(sampleType)) {
+    return null;
+  }
+
+  const freshBloodStatus = toOptionalString(detail?.freshBloodStatus);
+  if (freshBloodStatus && !isAllowedOption(freshBloodStatus, FRESH_BLOOD_STATUS_OPTIONS)) {
+    return "新鲜血液情况选项无效。";
+  }
+
+  const storageCondition = toOptionalString(detail?.storageCondition);
+  if (storageCondition && !isAllowedOption(storageCondition, STORAGE_CONDITION_OPTIONS)) {
+    return "储存条件选项无效。";
+  }
+
+  const checker = toOptionalString(detail?.checker);
+  if (checker && !isAllowedOption(checker, SAMPLE_CHECKER_OPTIONS)) {
+    return "登记及核对人员选项无效。";
+  }
+
+  if (sampleType === "CELL") {
+    const preservationMedium = toOptionalString(detail?.preservationMedium);
+    if (
+      preservationMedium &&
+      !isAllowedOption(preservationMedium, CELL_PRESERVATION_MEDIUM_OPTIONS)
+    ) {
+      return "细胞保存介质选项无效。";
+    }
+  }
+
+  return null;
+}
+
+function isAllowedOption(value: string, options: readonly string[]) {
+  return options.some((option) => option === value);
+}
+
+function toOptionalInteger(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) ? numberValue : null;
 }

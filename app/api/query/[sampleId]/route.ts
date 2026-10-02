@@ -8,7 +8,7 @@ import { ensureAllHashCodes, resolveSampleIdentity } from "@/lib/sample-identity
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ sampleId: string }> | { sampleId: string };
+  params: Promise<{ sampleId: string }>;
 };
 
 export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
@@ -20,7 +20,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   const sampleId = identity?.id ?? requestedId;
 
   if (!sampleId) {
-    return jsonError("请输入样本 ID。");
+    return jsonError("请输入样本 ID、冻存管 ID 或短码。");
   }
 
   const baseSample = await prisma.sample.findUnique({
@@ -44,7 +44,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
   });
 
   if (!baseSample && !derivedSample) {
-    return jsonError("没有找到该样本 ID。", 404);
+    return jsonError("没有找到该样本 ID、冻存管 ID 或短码。", 404);
   }
 
   const upstream = await buildUpstream(sampleId);
@@ -87,6 +87,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
       ? {
           id: baseSample.id,
           hashCode: baseSample.hashCode,
+          tubeId: baseSample.tubeId,
           name: baseSample.name,
           type: SAMPLE_TYPES[baseSample.type],
           projectCode: baseSample.projectCode,
@@ -104,6 +105,8 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
           createdAt: derivedSample?.createdAt,
           result: derivedSample?.result,
           registration: derivedSample?.entry?.registration ?? null,
+          inputAmount: derivedSample?.entry?.inputAmount ?? null,
+          inputUnit: derivedSample?.entry?.inputUnit ?? null,
           inputAmountNg: derivedSample?.entry?.inputAmountNg ?? null
         },
     rootSample,
@@ -211,6 +214,8 @@ function formatStep(step: Awaited<ReturnType<typeof getDerivedStep>> extends inf
     createdAt: step.createdAt,
     result: step.result,
     registration: step.entry?.registration ?? null,
+    inputAmount: step.entry?.inputAmount ?? null,
+    inputUnit: step.entry?.inputUnit ?? null,
     inputAmountNg: step.entry?.inputAmountNg ?? null
   };
 }

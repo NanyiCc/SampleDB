@@ -8,7 +8,7 @@ import { ensureAllHashCodes } from "@/lib/sample-identity";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export const GET = withAuth(async (_request: NextRequest, context: RouteContext) => {
@@ -53,6 +53,7 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
       select: {
         id: true,
         hashCode: true,
+        tubeId: true,
         name: true
       }
     }),
@@ -88,9 +89,11 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
       <th>测序策略</th>
       <th>储存路径</th>
       <th>原样本ID</th>
+      <th>冻存管ID</th>
       <th>原样本短码</th>
       <th>样本名称</th>
-      <th>上样量/投入量 (ng)</th>
+      <th>取样量/投入量</th>
+      <th>单位</th>
       <th>生成样本ID</th>
       <th>生成样本短码</th>
       <th>备注</th>
@@ -107,9 +110,14 @@ export const GET = withAuth(async (_request: NextRequest, context: RouteContext)
       <td>${escapeHtml(registration.sequencingStrategy ?? "")}</td>
       <td>${escapeHtml(registration.storagePath ?? "")}</td>
       <td>${escapeHtml(entry.sourceSampleId)}</td>
+      <td>${escapeHtml(sourceSamples.find((sample) => sample.id === entry.sourceSampleId)?.tubeId ?? "")}</td>
       <td>${escapeHtml(sourceHashMap.get(entry.sourceSampleId) ?? "")}</td>
       <td>${escapeHtml(sourceNameMap.get(entry.sourceSampleId) ?? entry.sourceSampleId)}</td>
-      <td>${escapeHtml(entry.inputAmountNg)}</td>
+      <td>${escapeHtml(entry.inputAmount ?? entry.inputAmountNg ?? "")}</td>
+      <td>${escapeHtml(
+        entry.inputUnit ??
+          (entry.inputAmountNg !== null && entry.inputAmountNg !== undefined ? "ng" : "")
+      )}</td>
       <td>${escapeHtml(entry.derivedSampleId)}</td>
       <td>${escapeHtml(entry.derivedSample.hashCode ?? "")}</td>
       <td>${escapeHtml(registration.remark ?? "")}</td>

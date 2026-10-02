@@ -29,6 +29,11 @@ export const GET = withAuth(async (request: NextRequest) => {
             hashCode: {
               contains: query
             }
+          },
+          {
+            tubeId: {
+              contains: query
+            }
           }
         ]
       },
@@ -70,6 +75,7 @@ export const GET = withAuth(async (request: NextRequest) => {
       ...samples.map((sample) => ({
         id: sample.id,
         hashCode: sample.hashCode,
+        tubeId: sample.tubeId,
         kind: "BASE_SAMPLE",
         label: SAMPLE_TYPES[sample.type],
         createdAt: sample.storedAt

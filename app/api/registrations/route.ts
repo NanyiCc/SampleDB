@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { withAuth } from "@/lib/auth";
+import { getCurrentUser, withAuth } from "@/lib/auth";
 import {
   EXPERIMENT_CONFIG,
   ExperimentType,
@@ -31,6 +31,9 @@ type RegistrationBody = {
   storagePath?: string;
   entries?: Array<{
     sampleId?: string;
+    inputAmount?: unknown;
+    inputUnit?: string;
+    /** @deprecated Kept for clients created before sampling units became configurable. */
     inputAmountNg?: unknown;
   }>;
 };
@@ -68,7 +71,11 @@ export const POST = withAuth(async (request: NextRequest) => {
   const experimentType = body.experimentType;
   const title = toOptionalString(body.title);
   const requestedProjectCode = normalizeProjectCode(body.projectCode ?? "");
-  const operator = body.operator?.trim() ?? "";
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return jsonError("请先登录后再使用样本库管理系统。", 401);
+  }
+  const operator = currentUser.displayName?.trim() || currentUser.username;
   const rawEntries = Array.isArray(body.entries) ? body.entries : [];
 
   if (!experimentType || !(experimentType in EXPERIMENT_CONFIG)) {
@@ -94,7 +101,8 @@ export const POST = withAuth(async (request: NextRequest) => {
   const rawInputEntries = rawEntries
     .map((entry) => ({
       sampleId: normalizeSampleId(entry.sampleId ?? ""),
-      inputAmountNg: Number(entry.inputAmountNg)
+      inputAmount: Number(entry.inputAmount ?? entry.inputAmountNg),
+      inputUnit: toOptionalString(entry.inputUnit) ?? (entry.inputAmountNg !== undefined ? "ng" : "")
     }))
     .filter((entry) => entry.sampleId.length > 0);
 
@@ -102,31 +110,45 @@ export const POST = withAuth(async (request: NextRequest) => {
     return jsonError("请至少登记一个取用样本。");
   }
 
-  if (rawInputEntries.some((entry) => !Number.isFinite(entry.inputAmountNg) || entry.inputAmountNg < 0)) {
-    return jsonError("上样量/投入量 (ng) 必须是大于或等于 0 的数字。");
+  if (rawInputEntries.some((entry) => !Number.isFinite(entry.inputAmount) || entry.inputAmount < 0)) {
+    return jsonError("取样量/投入量必须是大于或等于 0 的数字。");
+  }
+
+  if (rawInputEntries.some((entry) => !entry.inputUnit)) {
+    return jsonError("请填写每个取用样本的单位。");
   }
 
   try {
     const createdRegistration = await prisma.$transaction(async (tx) => {
-      const identities: Array<SampleIdentity & { inputAmountNg: number; inputValue: string }> = [];
+      const identities: Array<SampleIdentity & { inputAmount: number; inputUnit: string; inputValue: string }> = [];
       const missingInputs: string[] = [];
 
       for (const entry of rawInputEntries) {
-        const identity = await resolveSampleIdentity(tx, entry.sampleId);
+        const identity = await resolveSampleIdentity(tx, entry.sampleId, {
+          tubeOnly: experimentType === "SINGLE_CELL"
+        });
         if (!identity) {
           missingInputs.push(entry.sampleId);
         } else {
-          identities.push({ ...identity, inputAmountNg: entry.inputAmountNg, inputValue: entry.sampleId });
+          identities.push({
+            ...identity,
+            inputAmount: entry.inputAmount,
+            inputUnit: entry.inputUnit,
+            inputValue: entry.sampleId
+          });
         }
       }
 
       if (missingInputs.length > 0) {
-        throw new Error(`MISSING_SAMPLE:${missingInputs.join(", ")}`);
+        throw new Error(
+          `${experimentType === "SINGLE_CELL" ? "MISSING_TUBE" : "MISSING_SAMPLE"}:${missingInputs.join(", ")}`
+        );
       }
 
       const entries = identities.map((identity) => ({
         sampleId: identity.id,
-        inputAmountNg: identity.inputAmountNg,
+        inputAmount: identity.inputAmount,
+        inputUnit: identity.inputUnit,
         inputValue: identity.inputValue
       }));
       const sourceProjectCodes = Array.from(
@@ -200,7 +222,8 @@ export const POST = withAuth(async (request: NextRequest) => {
           data: {
             registrationId: registration.id,
             sourceSampleId: entry.sampleId,
-            inputAmountNg: entry.inputAmountNg,
+            inputAmount: entry.inputAmount,
+            inputUnit: entry.inputUnit,
             derivedSampleId
           }
         });
@@ -233,6 +256,10 @@ export const POST = withAuth(async (request: NextRequest) => {
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("MISSING_SAMPLE:")) {
       return jsonError(`以下样本 ID/短码不存在：${error.message.replace("MISSING_SAMPLE:", "")}`, 404);
+    }
+
+    if (error instanceof Error && error.message.startsWith("MISSING_TUBE:")) {
+      return jsonError(`以下冻存管 ID 不存在：${error.message.replace("MISSING_TUBE:", "")}`, 404);
     }
 
     if (error instanceof Error && error.message.startsWith("PROJECT_MISMATCH:")) {
